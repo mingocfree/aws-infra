@@ -15,10 +15,12 @@ CONFIG_FILE_PATHS = {
 
 def load_config() -> dict:
 
-    env = os.getenv("ENV", "dev")
+    env = os.getenv("ENV", "dev").lower()
     config = {
         "env": env,
-        "backend_repository_url": os.getenv("BACKEND_REPOSITORY"),
+        "backend_repository_url": os.getenv(
+            "BACKEND_REPOSITORY", "mingocfree/aws-java"
+        ),
     }
     loaded_config = {}
     with open(CONFIG_FILE_PATHS[env]) as config_file:
@@ -26,7 +28,7 @@ def load_config() -> dict:
 
     config.update(loaded_config)
     if not config.get("account_number", ""):
-        config["account_number"] =  os.getenv("AWS_ACCOUNT_NUMBER", ""),
+        config["account_number"] = os.getenv("AWS_ACCOUNT_NUMBER", "")
     return config
 
 

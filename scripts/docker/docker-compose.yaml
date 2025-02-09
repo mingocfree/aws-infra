@@ -1,0 +1,18 @@
+---
+services:
+    fastapi:
+        image: ${ECR_REPOSITORY_URI}:latest
+        ports:
+            - 80:80
+        restart: always
+        environment:
+            - ENV=production
+
+        healthcheck:
+            test: [CMD, curl, -f, http://localhost/health]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 40s
+        logging:
+            driver: awslogs
