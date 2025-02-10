@@ -1,6 +1,6 @@
 import os
 
-from aws_cdk import CfnOutput, Duration, Stack
+from aws_cdk import Duration, Stack
 from aws_cdk import aws_autoscaling as autoscaling
 from aws_cdk import aws_ec2 as ec2
 from aws_cdk import aws_elasticloadbalancingv2 as elbv2
@@ -140,10 +140,3 @@ class AutoScalingGroupStack(Stack):
 
         self.target_group_blue.add_target(self.asg)
         self.target_group_green.add_target(self.asg)
-
-        CfnOutput(
-            self,
-            "LoadBalancerDNS",
-            value=self.lb.load_balancer_dns_name,
-            description="ALB DNS Name",
-        )

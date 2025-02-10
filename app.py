@@ -2,9 +2,10 @@
 import os
 
 import aws_cdk as cdk
+from git import Repo
 from ruamel.yaml import YAML
 
-from aws_infra.aws_infra_stack import AwsInfraStack
+from aws_infra.aws_infra_pipeline import InfraPipelineStack
 
 CONFIG_FILE_PATHS = {
     "dev": "config/dev.yaml",
@@ -15,9 +16,16 @@ CONFIG_FILE_PATHS = {
 
 def load_config() -> dict:
 
-    env = os.getenv("ENV", "dev").lower()
+    current_branch = Repo(search_parent_directories=True).active_branch
+    env = current_branch.name
+    if current_branch.name == "main":
+        env = "production"
+
+    if env not in CONFIG_FILE_PATHS:
+        return {}
     config = {
         "env": env,
+        "repository_branch": current_branch.name,
         "backend_repository_url": os.getenv(
             "BACKEND_REPOSITORY", "mingocfree/aws-java"
         ),
@@ -32,13 +40,15 @@ def load_config() -> dict:
     return config
 
 
-def init_app() -> cdk.App:
+def init_app() -> cdk.App | None:
 
     app = cdk.App()
     config = load_config()
-    AwsInfraStack(
+    if not config:
+        return None
+    InfraPipelineStack(
         app,
-        "AwsInfraStack",
+        "AwsInfraPipelineStack",
         config=config,
         env={"account": config["account_number"], "region": config["region"]},
     )
@@ -47,4 +57,5 @@ def init_app() -> cdk.App:
 
 if __name__ == "__main__":
     app = init_app()
-    app.synth()
+    if app:
+        app.synth()
