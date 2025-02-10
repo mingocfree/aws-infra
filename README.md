@@ -1,6 +1,11 @@
-
 # Welcome to your CDK Python project!
 
+## Workflows Overview
+
+Below is an overview of the workflows set up using this repository:
+![infrastructure](static/workflows.png)
+
+## Introduce
 This is a blank project for CDK development with Python.
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
