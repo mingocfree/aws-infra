@@ -1,2 +1,14 @@
 ---
-region:
+account_number: 123459999999
+region: us-west-2
+repository:
+    owner: minhngocfree
+    name: aws-java
+ec2_properties:
+    instance_type: t3.medium
+scaling_policy:
+    target_cpu_utilization: 60
+    scale_in_cooldown: 300
+    scale_out_cooldown: 300
+    min_capacity: 4
+    max_capacity: 8
