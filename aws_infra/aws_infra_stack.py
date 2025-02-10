@@ -1,51 +1,127 @@
-from aws_cdk import RemovalPolicy, Stack
-from aws_cdk import aws_autoscaling as autoscaling
+from aws_cdk import Duration, RemovalPolicy, SecretValue, Stack
 from aws_cdk import aws_codebuild as codebuild
 from aws_cdk import aws_codedeploy as codedeploy
 from aws_cdk import aws_codepipeline as codepipeline
-from aws_cdk import aws_codepipeline_actions as codepipeline_actions
-from aws_cdk import aws_ec2 as ec2
-from aws_cdk import aws_elasticloadbalancingv2 as elbv2
+from aws_cdk import aws_codepipeline_actions as pipeline_actions
+from aws_cdk import aws_ecr as ecr
+from aws_cdk import aws_ecs as ecs
 from aws_cdk import aws_iam as iam
-from aws_cdk import aws_s3 as s3
-from aws_cdk import pipelines
-from aws_cdk.aws_codecommit import Repository
 from constructs import Construct
+
+from aws_infra.autoscaling_group_stack import AutoScalingGroupStack
 
 
 class AwsInfraStack(Stack):
-
     def __init__(
         self, scope: Construct, construct_id: str, config: dict, **kwargs
     ) -> None:
         super().__init__(scope, construct_id, **kwargs)
+        env = config.get("env", "dev")
+        github_repository = config.get("repository", {})
 
-        vpc = ec2.Vpc(self, f"{config["env"]}-VPC")
-
-        # Security Group for EC2 instances
-        sg = ec2.SecurityGroup(
-            self, f"{config["env"]}-SG", vpc=vpc, allow_all_outbound=True
-        )
-        sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(80), "Allow HTTP")
-        sg.add_ingress_rule(ec2.Peer.any_ipv4(), ec2.Port.tcp(22), "Allow SSH")
-        # The code that defines your stack goes here
-
-        branch = config["env"]
-        if config["env"] == "production":
-            branch = "main"
-        pipeline = pipelines.CodePipeline(
+        repository = ecr.Repository(
             self,
-            "Pipeline",
-            synth=pipelines.ShellStep(
-                "Synth",
-                input=pipelines.CodePipelineSource.git_hub("owner/repo", branch),
-                commands=["npx", "cdk", "synth"],
-                primary_output_directory="cdk.out",
-            ),
+            f"{env}-Repository",
+            repository_name=github_repository.get("name", "aws-java"),
+            removal_policy=RemovalPolicy.DESTROY,
+            image_scan_on_push=True,
         )
 
-        # example resource
-        # queue = sqs.Queue(
-        #     self, "AwsInfraQueue",
-        #     visibility_timeout=Duration.seconds(300),
-        # )
+        build_project = codebuild.PipelineProject(
+            self,
+            f"{env}-BuildProject",
+            environment=codebuild.BuildEnvironment(
+                privileged=True,
+                build_image=codebuild.LinuxBuildImage.STANDARD_7_0,
+            ),
+            environment_variables={
+                "AWS_DEFAULT_REGION": codebuild.BuildEnvironmentVariable(
+                    value=self.region
+                ),
+                "AWS_ACCOUNT_ID": codebuild.BuildEnvironmentVariable(
+                    value=self.account
+                ),
+                "ECR_REPOSITORY_NAME": codebuild.BuildEnvironmentVariable(
+                    value=repository.repository_name
+                ),
+            },
+            timeout=Duration.minutes(30),
+        )
+
+        auto_scaling_group_stack = AutoScalingGroupStack(
+            self,
+            f"{env}-AutoScalingGroupStack",
+            config=config,
+            ecr_repository_uri=repository.repository_uri,
+            env={"region": self.region, "account": self.account},
+        )
+
+        ecs_application = codedeploy.EcsApplication(
+            self, f"{env}-EcsApplication"
+        )  # noqa
+        codedeploy_role = iam.Role(
+            self,
+            "CodeDeployRole",
+            assumed_by=iam.ServicePrincipal("codedeploy.amazonaws.com"),
+            managed_policies=[
+                iam.ManagedPolicy.from_aws_managed_policy_name(
+                    "AWSCodeDeployRole"
+                ),  # noqa
+                iam.ManagedPolicy.from_aws_managed_policy_name(
+                    "AWSCodeDeployFullAccess"
+                ),
+            ],
+        )
+
+        deployment_group = codedeploy.EcsDeploymentGroup(
+            self,
+            f"{env}-DeploymentGroup",
+            application=ecs_application,
+            deployment_group_name=f"{env}-BlueGreenDeployment",
+            service=ecs.Ec2Service,
+            auto_scaling_groups=[auto_scaling_group_stack.asg],
+            role=codedeploy_role,
+            blue_green_deployment_config=codedeploy.EcsBlueGreenDeploymentConfig(  # noqa
+                test_listener=auto_scaling_group_stack.listener_green,
+                listener=auto_scaling_group_stack.listener,
+                blue_target_group=auto_scaling_group_stack.target_group_blue,
+                green_target_group=auto_scaling_group_stack.target_group_green,
+                termination_wait_time=Duration.minutes(5),
+            ),
+            deployment_config=codedeploy.EcsDeploymentConfig.CANARY_10PERCENT_5MINUTES,  # noqa
+            auto_rollback=codedeploy.AutoRollbackConfig(
+                stopped_deployment=True
+            ),  # noqa
+        )
+
+        source_output = codepipeline.Artifact()
+        build_output = codepipeline.Artifact()
+        pipeline = codepipeline.Pipeline(
+            self, f"{env}-Pipeline", pipeline_name=f"{env}-aws-java-pipeline"
+        )
+
+        source_action = pipeline_actions.GitHubSourceAction(
+            action_name=f"{env}-Source",
+            owner=github_repository.get("owner", "mingocfree"),
+            repo=github_repository.get("name", "aws-java"),
+            branch=config.get("repository_branch", "dev"),
+            oauth_token=SecretValue.secrets_manager("github-token"),
+            output=source_output,
+        )
+        pipeline.add_stage(stage_name=f"{env}-Source", actions=[source_action])
+
+        build_action = pipeline_actions.CodeBuildAction(
+            action_name="BuildAndPush",
+            project=build_project,
+            input=source_output,
+            outputs=[build_output],
+        )
+        pipeline.add_stage(stage_name="Build", actions=[build_action])
+
+        deploy_action = pipeline_actions.CodeDeployEcsDeployAction(
+            action_name="BlueGreenDeploy",
+            deployment_group=deployment_group,
+            app_spec_template_input=build_output,
+            task_definition_template_input=build_output,
+        )
+        pipeline.add_stage(stage_name="Deploy", actions=[deploy_action])
