@@ -15,7 +15,7 @@ def user_data_generation(ecr_repository_uri: str, region: str) -> str:
     with open(
         os.path.join(path, "scripts/docker/docker-compose.yaml"),
         "r",
-        encoding="utf-8",  # noqa
+        encoding="utf-8",
     ) as f:
         docker_compose_text = f.read().replace(
             "${ECR_REPOSITORY_URI}", ecr_repository_uri
@@ -50,13 +50,29 @@ class AutoScalingGroupStack(Stack):
         ec2_properties = config.get("ec2_properties", {})
         scaling_policy = config.get("scaling_policy", {})
 
-        vpc = ec2.Vpc(self, f"{env}-VPC", max_azs=2)
+        vpc = ec2.Vpc(
+            self,
+            f"{env}-VPC",
+            nat_gateways=1,
+            subnet_configuration=[
+                ec2.SubnetConfiguration(
+                    name="PublicSubnet",
+                    subnet_type=ec2.SubnetType.PUBLIC,
+                    cidr_mask=24,
+                ),
+                ec2.SubnetConfiguration(
+                    name="PrivateSubnet",
+                    subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS,
+                    cidr_mask=24,
+                ),
+            ],
+        )
 
         lb_security_group = ec2.SecurityGroup(
             self, f"{env}-LB-SG", vpc=vpc, allow_all_outbound=True
         )
         lb_security_group.add_ingress_rule(
-            ec2.Peer.any_ipv4(), ec2.Port.tcp(80), "Allow HTTP traffic"  # noqa
+            ec2.Peer.any_ipv4(), ec2.Port.tcp(80), "Allow HTTP traffic"
         )
 
         self.lb = elbv2.ApplicationLoadBalancer(
@@ -74,9 +90,7 @@ class AutoScalingGroupStack(Stack):
             port=80,
             protocol=elbv2.ApplicationProtocol.HTTP,
             target_type=elbv2.TargetType.INSTANCE,
-            health_check=elbv2.HealthCheck(
-                path="/health", healthy_http_codes="200"
-            ),  # noqa
+            health_check=elbv2.HealthCheck(path="/health", healthy_http_codes="200"),
         )
 
         self.target_group_green = elbv2.ApplicationTargetGroup(
@@ -86,20 +100,19 @@ class AutoScalingGroupStack(Stack):
             port=80,
             protocol=elbv2.ApplicationProtocol.HTTP,
             target_type=elbv2.TargetType.INSTANCE,
-            health_check=elbv2.HealthCheck(
-                path="/health", healthy_http_codes="200"
-            ),  # noqa
+            health_check=elbv2.HealthCheck(path="/health", healthy_http_codes="200"),
         )
 
         self.listener = self.lb.add_listener(
             "ListenerBlue",
             port=80,
-            default_target_groups=[self.target_group_blue],  # noqa
+            default_target_groups=[self.target_group_blue],
         )
+
         self.listener_green = self.lb.add_listener(
             "ListenerGreen",
             port=80,
-            default_target_groups=[self.target_group_green],  # noqa
+            default_target_groups=[self.target_group_green],
         )
 
         role = iam.Role(
@@ -116,9 +129,7 @@ class AutoScalingGroupStack(Stack):
         launch_template = ec2.LaunchTemplate(
             self,
             "LaunchTemplate",
-            instance_type=ec2.InstanceType(
-                ec2_properties.get("instance_type", "t2.micro")
-            ),
+            instance_type=ec2.InstanceType(ec2_properties.get("instance_type", "t2.micro")),
             machine_image=ec2.AmazonLinuxImage(),
             user_data=ec2.UserData.custom(
                 user_data_generation(ecr_repository_uri, self.region)
@@ -130,13 +141,13 @@ class AutoScalingGroupStack(Stack):
             self,
             "AutoScalingGroup",
             vpc=vpc,
+            vpc_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS),
             launch_template=launch_template,
             min_capacity=scaling_policy.get("min_capacity", 2),
             max_capacity=scaling_policy.get("max_capacity", 4),
-            health_check=autoscaling.HealthCheck.elb(
-                grace=Duration.seconds(60)
-            ),  # noqa
+            health_check=autoscaling.HealthCheck.elb(grace=Duration.seconds(60)),
         )
 
+        # Attach ASG to both Blue and Green target groups
         self.target_group_blue.add_target(self.asg)
         self.target_group_green.add_target(self.asg)
