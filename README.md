@@ -1,6 +1,6 @@
 # Welcome to your CDK Python project!
 
-[dev-Ng-Nginx-rRVimfwv6IpP-1297245491.ap-southeast-1.elb.amazonaws.com](dev-Ng-Nginx-rRVimfwv6IpP-1297245491.ap-southeast-1.elb.amazonaws.com)
+[dev-Ng-Nginx-rRVimfwv6IpP-1297245491.ap-southeast-1.elb.amazonaws.com](http://dev-Ng-Nginx-rRVimfwv6IpP-1297245491.ap-southeast-1.elb.amazonaws.com)
 
 
  For archiiveing zero downtime deployment:
