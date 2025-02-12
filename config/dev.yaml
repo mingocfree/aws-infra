@@ -1,5 +1,5 @@
 ---
-account_number: 123456789012
+account_number: '123456789012'
 region: ap-southeast-1
 repository:
     owner: minhngocfree

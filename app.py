@@ -5,7 +5,7 @@ import aws_cdk as cdk
 from git import Repo
 from ruamel.yaml import YAML
 
-from aws_infra.aws_infra_pipeline import InfraPipelineStack
+from aws_infra.aws_infra_pipeline import TestAwsStack
 
 CONFIG_FILE_PATHS = {
     "dev": "config/dev.yaml",
@@ -46,11 +46,11 @@ def init_app() -> cdk.App | None:
     config = load_config()
     if not config:
         return None
-    InfraPipelineStack(
+    TestAwsStack(
         app,
         "AwsInfraPipelineStack",
+        env=config["env"],
         config=config,
-        env={"account": config["account_number"], "region": config["region"]},
     )
     return app
 
