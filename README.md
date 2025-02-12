@@ -1,9 +1,27 @@
 # Welcome to your CDK Python project!
 
+dev-Ng-Nginx-rRVimfwv6IpP-1297245491.ap-southeast-1.elb.amazonaws.com
+
+ For archiiveing zero downtime deployment:
+ i used Docker Compose + Docker Rollout for that 
+
+
 ## Workflows Overview
 
-Below is an overview of the workflows set up using this repository:
+Below is an overview of the workflows set up using this repository and pictures:
 ![infrastructure](static/workflows.png)
+
+![infrastructure](static/Screenshot%20deploy%20cli.png)
+
+![infrastructure](static/Screenshot%20deploy.png)
+
+![infrastructure](static/Screenshot%20formation.png)
+
+![infrastructure](static/Screenshot%20pipeline.png)
+
+-> i got rate limit from docker 
+
+
 
 ## Introduce
 This is a blank project for CDK development with Python.
