@@ -22,6 +22,11 @@ Below is an overview of the workflows set up using this repository and pictures:
 
 -> i got rate limit from docker 
 
+![infrastructure](static/Screenshot%20asg.png)
+![infrastructure](static/Screenshot%20ec2.png)
+![infrastructure](static/Screenshot%20elb.png)
+
+
 
 
 ## Introduce
