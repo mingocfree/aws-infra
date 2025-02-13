@@ -1,38 +1,35 @@
 #!/bin/bash
 
 # Update system packages
-yum update -y
+sudo dnf update -y
 
 # Install Docker
-sudo amazon-linux-extras install docker
-
-sudo service docker start
-
-sudo usermod -a -G docker ec2-user
+sudo dnf install -y docker
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo usermod -aG docker ec2-user
 
 # Authenticate Docker with AWS ECR
-aws ecr get-login-password --region ${REGION} | docker login --username AWS --password-stdin ${ECR_REPOSITORY_URI}
+aws ecr get-login-password --region ${REGION} | sudo docker login --username AWS --password-stdin ${ECR_REPOSITORY_URI}
 
-sudo curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
+# Install Docker Compose v2
+sudo mkdir -p /usr/local/lib/docker/cli-plugins
+sudo curl -sL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-"$(uname -m)" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+sudo chown root:root /usr/local/lib/docker/cli-plugins/docker-compose
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
-sudo chmod +x /usr/local/bin/docker-compose
+# Install Docker Rollout plugin system-wide
+sudo curl -sSL https://raw.githubusercontent.com/wowu/docker-rollout/main/docker-rollout \
+  -o /usr/local/lib/docker/cli-plugins/docker-rollout
+sudo chown root:root /usr/local/lib/docker/cli-plugins/docker-rollout
+sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-rollout
 
-sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
-
-docker-compose version
-
-# Create directory for Docker CLI plugins
-mkdir -p ~/.docker/cli-plugins
-
-# Download docker-rollout script to Docker CLI plugins directory
-curl -sSL https://raw.githubusercontent.com/wowu/docker-rollout/main/docker-rollout -o ~/.docker/cli-plugins/docker-rollout
-
-# Make the script executable
-chmod +x ~/.docker/cli-plugins/docker-rollout
-
-mkdir -p /etc/docker
-cat <<EOT >/etc/docker/docker-compose.yml
+# Create docker-compose configuration
+sudo mkdir -p /etc/docker
+cat <<EOT | sudo tee /etc/docker/docker-compose.yml >/dev/null
 ${DOCKER_COMPOSE_CONTENT}
 EOT
 
-docker-compose -f /etc/docker/docker-compose.yml up -d
+# Start containers
+sudo docker compose -f /etc/docker/docker-compose.yml up -d

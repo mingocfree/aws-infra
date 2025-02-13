@@ -4,7 +4,7 @@
 
 
  For archiiveing zero downtime deployment:
- i used Docker Compose + Docker Rollout for that 
+ i used Docker Compose + Docker Rollout for that
 
 
 ## Workflows Overview
@@ -20,7 +20,7 @@ Below is an overview of the workflows set up using this repository and pictures:
 
 ![infrastructure](static/Screenshot%20pipeline.png)
 
--> i got rate limit from docker 
+-> i got rate limit from docker
 
 ![infrastructure](static/Screenshot%20asg.png)
 ![infrastructure](static/Screenshot%20ec2.png)
