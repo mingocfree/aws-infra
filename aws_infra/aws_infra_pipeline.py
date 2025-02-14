@@ -11,13 +11,13 @@ from aws_cdk import aws_iam as iam
 from aws_cdk import aws_ssm as ssm
 from constructs import Construct
 
-path = os.path.dirname(__file__)
+PATH = os.path.dirname(__file__)
 
 
 def user_data_generation(ecr_repository_uri: str, region: str) -> str:
     """Generates user data for EC2 instances."""
     with open(
-        os.path.join(path, "../scripts/docker/docker-compose.yaml"),
+        os.path.join(PATH, "../scripts/docker/docker-compose.yaml"),
         "r",
         encoding="utf-8",
     ) as f:
@@ -26,7 +26,7 @@ def user_data_generation(ecr_repository_uri: str, region: str) -> str:
         )
 
     with open(
-        os.path.join(path, "../scripts/user-data/user-data.sh"),
+        os.path.join(PATH, "../scripts/user-data/user-data.sh"),
         "r",
         encoding="utf-8",
     ) as f:
@@ -192,7 +192,7 @@ class NginxPipelineStack(Stack):
             ),
             build_spec=codebuild.BuildSpec.from_asset(
                 os.path.join(
-                    path, "../scripts/buildspec/nginx-pipeline/deploy.yaml"
+                    PATH, "../manifest/buildspec/nginx-pipeline/deploy.yaml"
                 )  # noqa
             ),
             role=iam.Role(
@@ -223,7 +223,9 @@ class NginxPipelineStack(Stack):
             self,
             "DeployProject",
             build_spec=codebuild.BuildSpec.from_asset(
-                os.path.join(path, "../scripts/buildspec/buildspec.yaml")
+                os.path.join(
+                    PATH, "../manifest/buildspec/nginx-pipeline/deploy.yaml"
+                )  # noqa
             ),
             environment=codebuild.BuildEnvironment(
                 build_image=codebuild.LinuxBuildImage.STANDARD_6_0,
@@ -270,7 +272,7 @@ class NginxPipelineStack(Stack):
             hashlib.md5(
                 open(
                     os.path.join(
-                        path, "../scripts/buildspec/nginx-pipeline/deploy.yaml"
+                        PATH, "../manifest/buildspec/nginx-pipeline/deploy.yaml"  # noqa
                     ),  # noqa
                     "rb",  # noqa
                 ).read(),
