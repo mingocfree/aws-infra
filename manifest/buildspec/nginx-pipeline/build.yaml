@@ -1,18 +1,21 @@
 ---
 version: '0.2'
 phases:
+    pre_build:
+        commands:
+            - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c1-8) # noqa
+            - export IMAGE_TAG=$COMMIT_HASH
+            - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI # noqa
     build:
         commands:
-            - IMAGE_TAG=$(aws ssm get-parameter --name /nginx/image-tag --region $AWS_REGION --query 'Parameter.Value' --output text)
-            - INSTANCE_ID=$(aws ssm get-parameter --name /nginx/instance-id --region $AWS_REGION --query 'Parameter.Value' --output text)
-            - |
-              echo "Deploying to instance: $INSTANCE_ID"
-              aws ssm send-command \
-                --instance-ids $INSTANCE_ID \
-                --document-name "AWS-RunShellScript" \
-                --parameters commands="[ \
-                  \"aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI\", \
-                  \"sudo sed -i \\\"s|image: $ECR_REPO_URI:[^ ]*|image: $ECR_REPO_URI:$IMAGE_TAG|g\\\" /etc/docker/docker-compose.yml\", \
-                  \"sudo docker rollout -f /etc/docker/docker-compose.yml web\" \
-                ]" \
-                --region $AWS_REGION
+            - docker build -t $ECR_REPO_URI:latest .
+            - docker tag $ECR_REPO_URI:latest $ECR_REPO_URI:$IMAGE_TAG # noqa
+    post_build:
+        commands:
+            - aws ssm put-parameter --name /nginx/image-tag --value $IMAGE_TAG --type String --overwrite # noqa
+            - docker push $ECR_REPO_URI:$IMAGE_TAG
+            - docker push $ECR_REPO_URI:latest
+            - echo $IMAGE_TAG > image-tag.txt
+artifacts:
+    files:
+        - image-tag.txt
